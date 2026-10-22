@@ -1,0 +1,14 @@
+{
+  "name": "glamora",
+  "version": "1.0.0",
+  "description": "Glamora - Luxury Beauty & Services Booking Platform",
+  "scripts": {
+    "server": "npm run start --prefix server",
+    "client": "npm run dev --prefix client",
+    "seed": "npm run seed --prefix server",
+    "build": "npm run build --prefix client"
+  },
+  "keywords": ["mern", "booking", "salon", "beauty", "express", "react", "recharts"],
+  "author": "Glamora Team",
+  "license": "ISC"
+}
