@@ -28,7 +28,35 @@ const serviceSchema = new mongoose.Schema(
     },
     duration: {
       type: String,
-      default: '45 mins'
+      default: '60 mins'
+    },
+    durationMinutes: {
+      type: Number,
+      default: 60
+    },
+    startTime: {
+      type: String,
+      default: '09:00 AM'
+    },
+    endTime: {
+      type: String,
+      default: '08:00 PM'
+    },
+    slots: {
+      type: [String],
+      default: [
+        '09:00 AM',
+        '10:00 AM',
+        '11:00 AM',
+        '12:00 PM',
+        '01:00 PM',
+        '02:00 PM',
+        '03:00 PM',
+        '04:00 PM',
+        '05:00 PM',
+        '06:00 PM',
+        '07:00 PM'
+      ]
     },
     isActive: {
       type: Boolean,

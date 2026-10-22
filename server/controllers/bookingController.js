@@ -17,14 +17,6 @@ const createBooking = async (req, res) => {
       });
     }
 
-    // Validate that slot is one of the valid fixed slots
-    if (!FIXED_SLOTS.includes(timeSlot)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid time slot. Allowed slots: ${FIXED_SLOTS.join(', ')}`
-      });
-    }
-
     // Verify service exists and is active
     const service = await Service.findById(serviceId);
     if (!service) {
@@ -34,9 +26,19 @@ const createBooking = async (req, res) => {
       return res.status(400).json({ success: false, message: 'This service is currently unavailable.' });
     }
 
-    // ⭐ FEATURE #2: SLOT CONFLICT DETECTION (Customer Side)
-    // Check if slot is already occupied by an active booking (pending or accepted)
+    // Validate that slot is valid for this service (or default slots)
+    const allowedSlots = (service.slots && service.slots.length > 0) ? service.slots : FIXED_SLOTS;
+    if (!allowedSlots.includes(timeSlot)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid time slot for "${service.name}". Please pick an available slot from the schedule.`
+      });
+    }
+
+    // ⭐ SLOT CONFLICT DETECTION (Customer Side)
+    // Check if slot is already occupied for this service on this date
     const existingConflict = await Booking.findOne({
+      serviceId,
       date,
       timeSlot,
       status: { $in: ['pending', 'accepted'] }

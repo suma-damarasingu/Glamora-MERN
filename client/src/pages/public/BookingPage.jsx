@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { Calendar, Clock, MapPin, FileText, Check, Sparkles, ArrowLeft, ShieldAlert, Edit3 } from 'lucide-react';
+import { Calendar, Clock, MapPin, FileText, Check, Sparkles, ArrowLeft, Edit3, ShieldCheck } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import TimeSlotPicker from '../../components/customer/TimeSlotPicker';
 
@@ -32,7 +32,7 @@ const BookingPage = () => {
   };
 
   // Retrieve saved address from localStorage or props
-  const savedAddress = localStorage.getItem('salonAddress') || "104 Blossom Avenue, In-Salon Chair 2";
+  const savedAddress = localStorage.getItem('salonAddress') || "Attili, West Godavari, Andhrapradesh-534134";
 
   const [services, setServices] = useState([]);
   const [selectedServiceId, setSelectedServiceId] = useState(serviceId || '');
@@ -50,7 +50,7 @@ const BookingPage = () => {
   // Sync address from localStorage in real-time if updated by admin
   useEffect(() => {
     const syncAddress = () => {
-      const saved = localStorage.getItem('salonAddress') || "104 Blossom Avenue, In-Salon Chair 2";
+      const saved = localStorage.getItem('salonAddress') || "Attili, West Godavari, Andhrapradesh-534134";
       setAddress(saved);
     };
     window.addEventListener('storage', syncAddress);
@@ -97,12 +97,15 @@ const BookingPage = () => {
     setSelectedService(found || null);
   };
 
-  // Fetch slot availability for selected date
-  const fetchAvailableSlots = async (selectedDate) => {
+  // Fetch slot availability for selected date & service
+  const fetchAvailableSlots = async (selectedDate, sId) => {
     try {
       setSlotsLoading(true);
       setSelectedSlot('');
-      const res = await api.get(`/slots/available?date=${selectedDate}`);
+      const activeServiceId = sId || selectedServiceId;
+      const res = await api.get(
+        `/slots/available?date=${selectedDate}${activeServiceId ? `&serviceId=${activeServiceId}` : ''}`
+      );
       if (res.data.success) {
         setSlotStatus(res.data.slotStatus || []);
       }
@@ -114,10 +117,10 @@ const BookingPage = () => {
   };
 
   useEffect(() => {
-    if (date) {
-      fetchAvailableSlots(date);
+    if (date && selectedServiceId) {
+      fetchAvailableSlots(date, selectedServiceId);
     }
-  }, [date]);
+  }, [date, selectedServiceId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -156,7 +159,7 @@ const BookingPage = () => {
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Booking failed. Please try again.';
       toast.error(errorMsg);
-      fetchAvailableSlots(date);
+      fetchAvailableSlots(date, selectedServiceId);
     } finally {
       setSubmitting(false);
     }
@@ -171,8 +174,8 @@ const BookingPage = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      {/* Top Breadcrumb */}
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      {/* Top Header & Breadcrumb */}
       <div>
         <Link
           to="/services"
@@ -184,48 +187,79 @@ const BookingPage = () => {
           Reserve Your Beauty Appointment
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Select your desired treatment, pick an available slot, and confirm your visit.
+          Select your customized treatment, pick your preferred timing, and secure your booking with Glamora.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Service Details Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* Left Column: Service Details & Summary Card */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="bg-white rounded-3xl p-6 border border-rose-100 shadow-sm sticky top-24">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Chosen Treatment
-            </h3>
+          <div className="bg-white rounded-3xl p-6 border border-rose-100 shadow-sm sticky top-24 space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-600">
+                Selected Treatment
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                {selectedService?.categoryId?.name || 'Service'}
+              </span>
+            </div>
 
             {selectedService ? (
               <div className="space-y-4">
-                <div className="h-44 rounded-2xl overflow-hidden relative shadow-inner bg-rose-50">
+                <div className="h-48 rounded-2xl overflow-hidden relative shadow-inner bg-rose-50 border border-rose-100">
                   <img
                     src={selectedService.image}
                     alt={selectedService.name}
                     className="w-full h-full object-cover"
                   />
-                  <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/90 backdrop-blur-md text-rose-700 shadow-sm">
-                    {selectedService.categoryId?.name || 'Beauty'}
-                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                  <div className="absolute bottom-3 left-3 right-3 text-white">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-md">
+                      {selectedService.duration || '60 mins'}
+                    </span>
+                  </div>
                 </div>
 
                 <div>
-                  <h4 className="font-extrabold text-base text-slate-900">
+                  <h4 className="font-extrabold text-lg text-slate-900 tracking-tight">
                     {selectedService.name}
                   </h4>
-                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                    {selectedService.description}
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed">
+                    {selectedService.description || 'Full luxury beauty session with our expert beauticians.'}
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-rose-100 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                    <Clock className="w-3.5 h-3.5 text-rose-500" />
-                    {selectedService.duration}
-                  </span>
-                  <span className="text-xl font-black text-rose-600">
-                    ${selectedService.price}
-                  </span>
+                {/* Pricing & Duration */}
+                <div className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Treatment Fee</span>
+                    <div className="text-2xl font-black text-rose-600 leading-none mt-0.5">
+                      ${selectedService.price}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Duration</span>
+                    <div className="text-xs font-bold text-slate-700 flex items-center gap-1 justify-end mt-0.5">
+                      <Clock className="w-3.5 h-3.5 text-rose-500" />
+                      {selectedService.duration || '60 mins'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Benefits / Guarantees */}
+                <div className="space-y-2 pt-2 border-t border-rose-100 text-xs text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Certified professional stylist & sanitized station</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Real-time conflict prevention active</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span>Instant confirmation upon booking</span>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -234,34 +268,36 @@ const BookingPage = () => {
           </div>
         </div>
 
-        {/* Right Column: Booking Form */}
+        {/* Right Column: Multi-Step Booking Form */}
         <div className="lg:col-span-2">
           <form
             onSubmit={handleSubmit}
-            className="bg-white rounded-3xl p-6 sm:p-8 border border-rose-100 shadow-sm space-y-6"
+            className="bg-white rounded-3xl p-6 sm:p-8 border border-rose-100 shadow-sm space-y-7"
           >
             {/* Step 1: Service Selection */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-rose-500" />
                 1. Select Treatment
               </label>
               <select
                 value={selectedServiceId}
                 onChange={(e) => handleServiceChange(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-rose-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                className="w-full px-4 py-3 rounded-2xl border border-rose-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white shadow-sm"
                 required
               >
                 {services.map((s) => (
                   <option key={s._id} value={s._id}>
-                    {s.name} — ${s.price} ({s.duration})
+                    {s.name} — ${s.price} ({s.duration || '60 mins'})
                   </option>
                 ))}
               </select>
             </div>
 
             {/* Step 2: Date Selection */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-rose-500" />
                 2. Choose Appointment Date
               </label>
               <input
@@ -269,21 +305,24 @@ const BookingPage = () => {
                 min={format(new Date(), 'yyyy-MM-dd')}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-rose-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                className="w-full px-4 py-3 rounded-2xl border border-rose-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white shadow-sm"
                 required
               />
             </div>
 
             {/* Step 3: Available Slot Selection */}
-            <div>
+            <div className="space-y-2">
               {slotsLoading ? (
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    3. CHOOSE AVAILABLE TIME SLOT
-                  </label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-rose-500" />
+                      3. Loading Available Slots...
+                    </label>
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 animate-pulse">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className="h-16 bg-rose-100/50 rounded-xl"></div>
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="h-16 bg-rose-100/50 rounded-2xl"></div>
                     ))}
                   </div>
                 </div>
@@ -291,12 +330,8 @@ const BookingPage = () => {
                 <TimeSlotPicker
                   selectedDate={date}
                   setSelectedDate={setDate}
-                  availableSlots={slotStatus.map((s) => ({
-                    id: s.slot,
-                    time: s.slot,
-                    isBooked: !s.isAvailable
-                  }))}
-                  selectedSlot={selectedSlot ? { id: selectedSlot, time: selectedSlot } : null}
+                  availableSlots={slotStatus}
+                  selectedSlot={selectedSlot}
                   onSelectSlot={(slot) => {
                     const chosen = slot?.time || slot?.slot || slot;
                     setSelectedSlot(chosen);
@@ -305,48 +340,53 @@ const BookingPage = () => {
               )}
 
               {selectedSlot && (
-                <p className="text-xs text-emerald-600 font-semibold -mt-3 mb-4 flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5" />
-                  Slot selected: {date} at {selectedSlot}
-                </p>
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Selected Appointment Slot: {date} at {selectedSlot}</span>
+                </div>
               )}
             </div>
 
             {/* Section 4: Address */}
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                4. SERVICE ADDRESS / STUDIO STATION
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-rose-500" />
+                4. Service Address / Studio Station
               </label>
-              
-              <div className={`flex items-center border rounded-lg p-3 bg-gray-50 ${isEditingAddress ? 'border-primary ring-1 ring-primary' : 'border-gray-200'}`}>
-                <MapPin className="text-gray-400 w-5 h-5 mr-3 flex-shrink-0" />
-                
+
+              <div
+                className={`flex items-center border rounded-2xl p-3.5 bg-rose-50/20 transition-all ${
+                  isEditingAddress ? 'border-rose-400 ring-2 ring-rose-200 bg-white' : 'border-rose-200'
+                }`}
+              >
+                <MapPin className="text-rose-400 w-5 h-5 mr-3 shrink-0" />
+
                 {isEditingAddress ? (
-                  <div className="flex w-full gap-2">
-                    <input 
+                  <div className="flex w-full gap-2 items-center">
+                    <input
                       type="text"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      className="flex-1 bg-transparent outline-none text-gray-800"
+                      className="flex-1 bg-transparent outline-none text-slate-800 text-sm font-medium"
                       autoFocus
                     />
                     <button
                       type="button"
                       onClick={() => setIsEditingAddress(false)}
-                      className="text-green-600 hover:text-green-700 p-1"
+                      className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1"
                     >
-                      <Check size={20} />
+                      <Check size={14} /> Done
                     </button>
                   </div>
                 ) : (
                   <div className="flex w-full justify-between items-center">
-                    <span className="text-gray-800 text-sm">{address}</span>
+                    <span className="text-slate-800 text-sm font-medium">{address}</span>
                     <button
                       type="button"
                       onClick={() => setIsEditingAddress(true)}
-                      className="text-primary hover:text-pink-700 ml-2 p-1"
+                      className="text-rose-600 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 flex items-center gap-1 text-xs font-semibold"
                     >
-                      <Edit3 size={18} />
+                      <Edit3 size={15} /> Edit
                     </button>
                   </div>
                 )}
@@ -354,34 +394,35 @@ const BookingPage = () => {
             </div>
 
             {/* Section 5: Notes */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                5. SPECIAL NOTES OR PREFERENCES <span className="text-gray-400 font-normal">(Optional)</span>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-rose-500" />
+                5. Special Requests or Notes <span className="text-slate-400 font-normal normal-case">(Optional)</span>
               </label>
-              <textarea 
+              <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Sensitive skin, bringing reference photo, etc."
-                className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:border-primary outline-none resize-none h-20"
+                placeholder="e.g. Sensitive skin, bridal reference, preferred stylist..."
+                className="w-full border border-rose-200 rounded-2xl p-3.5 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none resize-none h-20 bg-white shadow-sm"
               />
             </div>
 
-            {/* Submit */}
-            <div className="pt-4 border-t border-rose-100 flex items-center justify-end gap-4">
+            {/* Submit Bar */}
+            <div className="pt-4 border-t border-rose-100 flex flex-col sm:flex-row items-center justify-between gap-4">
               <Link
                 to="/services"
-                className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors w-full sm:w-auto text-center"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={submitting || !selectedSlot}
-                className="px-7 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-md shadow-rose-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-md shadow-rose-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting
                   ? 'Confirming Appointment...'
-                  : `Confirm Booking • $${selectedService?.price || 0}`}
+                  : `Confirm Appointment • $${selectedService?.price || 0}`}
               </button>
             </div>
           </form>

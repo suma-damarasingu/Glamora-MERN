@@ -98,6 +98,11 @@ function App() {
             </Route>
           </Route>
 
+          {/* Convenience Profile & Settings Redirects */}
+          <Route path="/profile" element={<Navigate to="/dashboard/settings" replace />} />
+          <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
+          <Route path="/admin/profile" element={<Navigate to="/admin/settings" replace />} />
+
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

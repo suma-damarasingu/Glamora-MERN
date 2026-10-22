@@ -12,10 +12,11 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => localStorage.getItem('glamora_token'));
   const [loading, setLoading] = useState(true);
 
-  // Check current session on mount
+  // Check current session on mount (only on initial load)
   useEffect(() => {
     const checkAuth = async () => {
-      if (token) {
+      const savedToken = localStorage.getItem('glamora_token');
+      if (savedToken) {
         try {
           const res = await api.get('/auth/me');
           if (res.data.success && res.data.user) {
@@ -24,21 +25,35 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (error) {
           console.error('Session restore failed:', error);
-          logout();
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem('glamora_token');
+            localStorage.removeItem('glamora_user');
+          }
         }
       }
       setLoading(false);
     };
     checkAuth();
-  }, [token]);
+  }, []);
 
-  // Step 1 of Login: check credentials & trigger OTP
-  const login = async (email, password) => {
-    const res = await api.post('/auth/login', { email, password });
+  // Login: authenticate credentials with role & save JWT token
+  const login = async (email, password, role) => {
+    const res = await api.post('/auth/login', { email, password, role });
+    if (res.data.success && res.data.token) {
+      const { token: receivedToken, user: receivedUser } = res.data;
+      // Synchronously commit to localStorage first before state update
+      localStorage.setItem('glamora_token', receivedToken);
+      localStorage.setItem('glamora_user', JSON.stringify(receivedUser));
+      setToken(receivedToken);
+      setUser(receivedUser);
+      setLoading(false);
+    }
     return res.data;
   };
 
-  // Step 2 of Login: verify OTP & receive token
+  // Step 2 of Login: verify OTP & receive token (legacy fallback)
   const verifyLoginOtp = async (email, otp) => {
     const res = await api.post('/auth/verify-login-otp', { email, otp });
     if (res.data.success) {
@@ -96,8 +111,8 @@ export const AuthProvider = ({ children }) => {
       }
     });
     if (res.data.success && res.data.user) {
-      setUser((prev) => ({ ...prev, ...res.data.user }));
-      localStorage.setItem('glamora_user', JSON.stringify({ ...user, ...res.data.user }));
+      setUser(res.data.user);
+      localStorage.setItem('glamora_user', JSON.stringify(res.data.user));
     }
     return res.data;
   };

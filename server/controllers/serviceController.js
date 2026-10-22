@@ -57,13 +57,66 @@ const getServiceById = async (req, res) => {
   }
 };
 
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return 540;
+  const [time, modifier] = timeStr.trim().split(' ');
+  let [hours, minutes] = (time || '09:00').split(':').map(Number);
+  if (hours === 12) hours = 0;
+  if (modifier === 'PM') hours += 12;
+  return hours * 60 + (minutes || 0);
+}
+
+function formatMinutesToTime(totalMinutes) {
+  let hours24 = Math.floor(totalMinutes / 60);
+  let minutes = totalMinutes % 60;
+  let modifier = hours24 >= 12 ? 'PM' : 'AM';
+  let hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return String(hours12).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ' ' + modifier;
+}
+
+function generateTimeSlots(startStr, endStr, durMinutes) {
+  const start = parseTimeToMinutes(startStr);
+  const end = parseTimeToMinutes(endStr);
+  const duration = Number(durMinutes) || 60;
+  const result = [];
+  for (let m = start; m + duration <= end; m += duration) {
+    result.push(formatMinutesToTime(m));
+  }
+  return result.length > 0 ? result : ['09:00 AM', '11:00 AM', '01:00 PM', '03:00 PM', '05:00 PM'];
+}
+
+function parseSlotsInput(slots) {
+  if (!slots) return null;
+  if (Array.isArray(slots)) return slots.map((s) => String(s).trim()).filter(Boolean);
+  if (typeof slots === 'string') {
+    try {
+      const parsed = JSON.parse(slots);
+      if (Array.isArray(parsed)) return parsed.map((s) => String(s).trim()).filter(Boolean);
+    } catch (e) {
+      return slots.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return null;
+}
+
 /**
  * @route   POST /api/services
  * @desc    Create service (Admin only)
  */
 const createService = async (req, res) => {
   try {
-    const { name, categoryId, price, description, duration, isActive } = req.body;
+    const {
+      name,
+      categoryId,
+      price,
+      description,
+      duration,
+      durationMinutes,
+      startTime,
+      endTime,
+      slots,
+      isActive
+    } = req.body;
     let image = req.body.image;
 
     if (!name || !categoryId || price === undefined) {
@@ -95,12 +148,24 @@ const createService = async (req, res) => {
       image = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80';
     }
 
+    const durMin = durationMinutes ? Number(durationMinutes) : 60;
+    const finalStartTime = startTime || '09:00 AM';
+    const finalEndTime = endTime || '08:00 PM';
+    const parsedSlots = parseSlotsInput(slots);
+    const finalSlots = (parsedSlots && parsedSlots.length > 0)
+      ? parsedSlots
+      : generateTimeSlots(finalStartTime, finalEndTime, durMin);
+
     const service = await Service.create({
       name: name.trim(),
       categoryId,
       price: Number(price),
       description: description || '',
-      duration: duration || '45 mins',
+      duration: duration || `${durMin} mins`,
+      durationMinutes: durMin,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
+      slots: finalSlots,
       image,
       isActive: isActive !== undefined ? isActive === 'true' || isActive === true : true
     });
@@ -123,7 +188,18 @@ const createService = async (req, res) => {
  */
 const updateService = async (req, res) => {
   try {
-    const { name, categoryId, price, description, duration, isActive } = req.body;
+    const {
+      name,
+      categoryId,
+      price,
+      description,
+      duration,
+      durationMinutes,
+      startTime,
+      endTime,
+      slots,
+      isActive
+    } = req.body;
     const service = await Service.findById(req.params.id);
 
     if (!service) {
@@ -141,6 +217,20 @@ const updateService = async (req, res) => {
     if (price !== undefined) service.price = Number(price);
     if (description !== undefined) service.description = description;
     if (duration !== undefined) service.duration = duration;
+    if (durationMinutes !== undefined) {
+      service.durationMinutes = Number(durationMinutes);
+      if (!duration) service.duration = `${durationMinutes} mins`;
+    }
+    if (startTime) service.startTime = startTime;
+    if (endTime) service.endTime = endTime;
+
+    const parsedSlots = parseSlotsInput(slots);
+    if (parsedSlots && parsedSlots.length > 0) {
+      service.slots = parsedSlots;
+    } else if (startTime && endTime) {
+      service.slots = generateTimeSlots(service.startTime, service.endTime, service.durationMinutes || 60);
+    }
+
     if (isActive !== undefined) {
       service.isActive = isActive === 'true' || isActive === true;
     }

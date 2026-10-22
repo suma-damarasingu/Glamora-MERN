@@ -5,7 +5,7 @@ import SettingsPage from '../customer/SettingsPage';
 
 const AdminSettingsPage = () => {
   const [salonData, setSalonData] = useState({
-    address: localStorage.getItem('salonAddress') || '104 Blossom Avenue, In-Salon Chair 2'
+    address: localStorage.getItem('salonAddress') || 'Attili, West Godavari, Andhrapradesh-534134'
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -53,7 +53,7 @@ const AdminSettingsPage = () => {
             <textarea
               value={salonData.address}
               onChange={(e) => setSalonData({ ...salonData, address: e.target.value })}
-              placeholder="Enter full salon address here (e.g., 104 Blossom Avenue...)"
+              placeholder="Enter full salon address here (e.g., Attili, West Godavari, Andhrapradesh-534134)"
               className="input-field w-full h-24"
               required
             />

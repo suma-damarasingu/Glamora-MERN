@@ -271,10 +271,15 @@ const ServicesManagement = () => {
                           ${service.price}
                         </td>
                         <td className="py-3.5 px-4 text-slate-600 font-medium">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-rose-400" />
-                            {service.duration}
+                          <span className="flex items-center gap-1 font-semibold text-slate-800">
+                            <Clock className="w-3.5 h-3.5 text-rose-500" />
+                            {service.duration || '60 mins'}
                           </span>
+                          {service.slots && service.slots.length > 0 && (
+                            <span className="text-[10px] text-rose-600 font-bold block mt-0.5">
+                              {service.slots.length} configured slots
+                            </span>
+                          )}
                         </td>
                         <td className="py-3.5 px-4">
                           <span

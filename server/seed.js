@@ -1,7 +1,11 @@
+const dns = require('node:dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const path = require('node:path');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const User = require('./models/User');
 const Category = require('./models/Category');
@@ -9,38 +13,27 @@ const Service = require('./models/Service');
 const Booking = require('./models/Booking');
 const Favorite = require('./models/Favorite');
 
+
 const seedDatabase = async () => {
-  let mongoServer = null;
   try {
-    console.log('🔄 Connecting to MongoDB...');
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/glamora';
+    console.log('Connecting to MongoDB Atlas...');
 
-    let connected = false;
-    if (mongoUri.includes('mongodb+srv://') || process.env.MONGODB_URI) {
-      try {
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
-        connected = true;
-        console.log('✅ Connected to MongoDB Atlas.');
-      } catch (e) {
-        console.warn('⚠️ Atlas connection failed:', e.message);
-      }
+    const mongoUri = process.env.MONGODB_URI;
+
+    if (!mongoUri || !mongoUri.startsWith('mongodb+srv://')) {
+      throw new Error(
+        'MongoDB Atlas URI missing. Check server/.env'
+      );
     }
 
-    if (!connected) {
-      try {
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 2000 });
-        connected = true;
-        console.log('✅ Connected to Local MongoDB.');
-      } catch (localErr) {
-        console.log('ℹ️ Local MongoDB not detected. Booting In-Memory MongoDB for seeding...');
-        const { MongoMemoryServer } = require('mongodb-memory-server');
-        mongoServer = await MongoMemoryServer.create();
-        const inMemoryUri = mongoServer.getUri();
-        await mongoose.connect(inMemoryUri);
-        connected = true;
-        console.log('✅ Connected to In-Memory MongoDB.');
-      }
-    }
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 15000
+    });
+
+    console.log('Connected to MongoDB Atlas');
+    console.log('Database:', mongoose.connection.name);
+
+    // Existing seeding code continues below...
 
     // Clear existing collections
     console.log('🧹 Clearing existing collections...');

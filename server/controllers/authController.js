@@ -34,6 +34,14 @@ const register = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     let existingUser = await User.findOne({ email: normalizedEmail });
 
+    // Single-Admin Protection: Admin email cannot be registered or overwritten publicly
+    if (existingUser && existingUser.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'This email is reserved for administration. Please use Admin Login.'
+      });
+    }
+
     if (existingUser && existingUser.isVerified) {
       return res.status(400).json({
         success: false,
@@ -45,15 +53,16 @@ const register = async (req, res) => {
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     if (existingUser && !existingUser.isVerified) {
-      // User registered before but didn't verify OTP; update record
+      // User registered before but didn't verify OTP; update record - strictly customer role
       existingUser.name = name.trim();
       existingUser.phone = phone.trim();
       existingUser.password = password; // pre-save will hash
+      existingUser.role = 'customer';
       existingUser.otp = otp;
       existingUser.otpExpiry = otpExpiry;
       await existingUser.save();
     } else {
-      // Create new unverified user
+      // Create new unverified user - strictly customer role
       existingUser = await User.create({
         name: name.trim(),
         email: normalizedEmail,
@@ -162,13 +171,14 @@ const verifyRegisterOtp = async (req, res) => {
 
 /**
  * @route   POST /api/auth/login
- * @desc    Verify credentials and send 2FA OTP to registered email
+ * @desc    Verify credentials, validate role boundaries, and issue JWT token directly
  */
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     if (!email || !password) {
+      console.warn('[Auth Login] Failed: Email and password are required.');
       return res.status(400).json({
         success: false,
         message: 'Email and password are required.'
@@ -176,9 +186,12 @@ const login = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    console.log(`[Auth Login] Login attempt for: '${normalizedEmail}'${role ? ` [Role requested: ${role}]` : ''}`);
+
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
+      console.warn(`[Auth Login] Failed: User not found with email '${normalizedEmail}'.`);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password.'
@@ -187,37 +200,57 @@ const login = async (req, res) => {
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.warn(`[Auth Login] Failed: Password mismatch for user '${normalizedEmail}'.`);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password.'
       });
     }
 
+    // Role boundary validation if role is specified by login mode
+    if (role && user.role !== role) {
+      console.warn(`[Auth Login] Role mismatch for '${normalizedEmail}'. Stored role: '${user.role}', attempted portal: '${role}'.`);
+      if (role === 'admin' && user.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: This account does not possess administrator privileges.'
+        });
+      }
+      if (role === 'customer' && user.role === 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Administrator account detected. Please use the Admin Login portal.'
+        });
+      }
+    }
+
     if (!user.isVerified) {
+      console.warn(`[Auth Login] Failed: Account '${normalizedEmail}' is not yet verified.`);
       return res.status(403).json({
         success: false,
         message: 'Account is not yet verified. Please complete registration verification.'
       });
     }
 
-    // Generate 2FA Login OTP
-    const otp = generateOTP();
-    user.otp = otp;
-    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-    await user.save();
-
-    await sendOtpEmail(user.email, otp, 'Login 2-Step Verification');
+    // Direct JWT Token generation
+    const token = generateToken(user._id, user.role);
+    console.log(`[Auth Login] Success: User '${user.email}' authenticated successfully as [${user.role}].`);
 
     res.status(200).json({
       success: true,
-      requireOtp: true,
-      message: 'Credentials verified! OTP has been sent to your registered email.',
-      email: user.email,
-      role: user.role,
-      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined
+      message: 'Login successful!',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profilePic: user.profilePic
+      }
     });
   } catch (error) {
-    console.error('Login Error:', error);
+    console.error('[Auth Login] Server Error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Server error during login.'
@@ -495,16 +528,22 @@ const updateProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const { name, phone, email } = req.body;
+    const { name, phone, email, password } = req.body;
     if (name) user.name = name.trim();
     if (phone) user.phone = phone.trim();
     if (email && email.toLowerCase().trim() !== user.email) {
-      // Check if new email is already in use
-      const existing = await User.findOne({ email: email.toLowerCase().trim() });
+      const normalizedEmail = email.toLowerCase().trim();
+      // Check if new email is already in use by another user
+      const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
       if (existing) {
-        return res.status(400).json({ success: false, message: 'Email already in use.' });
+        return res.status(400).json({ success: false, message: 'Email already in use by another account.' });
       }
-      user.email = email.toLowerCase().trim();
+      user.email = normalizedEmail;
+    }
+
+    // Support optional direct password update from profile form if provided
+    if (password && password.trim().length >= 6) {
+      user.password = password.trim();
     }
 
     // Handle file upload if present
@@ -523,6 +562,7 @@ const updateProfile = async (req, res) => {
     }
 
     await user.save();
+    console.log(`[Auth Profile] Profile updated for: ${user.email} (${user.role})`);
 
     res.status(200).json({
       success: true,
@@ -579,6 +619,7 @@ const changePassword = async (req, res) => {
 
     user.password = newPassword;
     await user.save();
+    console.log(`[Auth Password] Password changed successfully for: ${user.email}`);
 
     res.status(200).json({
       success: true,
@@ -593,6 +634,89 @@ const changePassword = async (req, res) => {
   }
 };
 
+/**
+ * @route   POST /api/auth/admin/setup
+ * @desc    Master-key protected endpoint to create or update the single admin account
+ */
+const setupAdmin = async (req, res) => {
+  try {
+    const { setupKey, name, email, password, phone } = req.body;
+    const masterKey = process.env.ADMIN_SETUP_KEY || 'glamora_master_setup_key_2026';
+
+    const providedKey = setupKey || req.headers['x-admin-setup-key'];
+    if (providedKey !== masterKey) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized: Invalid master setup key.'
+      });
+    }
+
+    const adminEmail = (email || 'admin@glamora.com').toLowerCase().trim();
+    const adminPassword = password || 'AdminPassword123!';
+    const adminName = (name || 'Glamora Admin').trim();
+    const adminPhone = (phone || '+1 555-0199').trim();
+
+    let admin = await User.findOne({ role: 'admin' });
+
+    if (admin) {
+      admin.name = adminName;
+      admin.email = adminEmail;
+      admin.phone = adminPhone;
+      admin.password = adminPassword;
+      admin.isVerified = true;
+      admin.otp = null;
+      admin.otpExpiry = null;
+      await admin.save();
+      console.log(`[Admin Setup] Single admin account updated: ${admin.email}`);
+    } else {
+      const existingUser = await User.findOne({ email: adminEmail });
+      if (existingUser) {
+        existingUser.role = 'admin';
+        existingUser.name = adminName;
+        existingUser.phone = adminPhone;
+        existingUser.password = adminPassword;
+        existingUser.isVerified = true;
+        existingUser.otp = null;
+        existingUser.otpExpiry = null;
+        await existingUser.save();
+        admin = existingUser;
+        console.log(`[Admin Setup] User promoted to single admin: ${admin.email}`);
+      } else {
+        admin = await User.create({
+          name: adminName,
+          email: adminEmail,
+          phone: adminPhone,
+          password: adminPassword,
+          role: 'admin',
+          isVerified: true
+        });
+        console.log(`[Admin Setup] Single admin account created: ${admin.email}`);
+      }
+    }
+
+    // Guarantee that strictly one admin exists
+    await User.deleteMany({ role: 'admin', _id: { $ne: admin._id } });
+
+    res.status(200).json({
+      success: true,
+      message: 'Single Admin account configured and verified successfully.',
+      admin: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        phone: admin.phone,
+        role: admin.role
+      }
+    });
+  } catch (error) {
+    console.error('Setup Admin Error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error setting up admin.'
+    });
+  }
+};
+
 module.exports = {
   register,
   verifyRegisterOtp,
@@ -603,5 +727,6 @@ module.exports = {
   resetPassword,
   getMe,
   updateProfile,
-  changePassword
+  changePassword,
+  setupAdmin
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
   LayoutDashboard,
@@ -98,17 +98,23 @@ const Sidebar = ({ role = 'customer' }) => {
 
       {/* User profile card & Logout */}
       <div className="p-4 border-t border-rose-100 bg-rose-50/30">
-        <div className="flex items-center gap-3 p-2 rounded-2xl bg-white border border-rose-100 shadow-sm mb-3">
+        <Link
+          to={role === 'admin' ? '/admin/settings' : '/dashboard/settings'}
+          className="flex items-center gap-3 p-2 rounded-2xl bg-white border border-rose-100 shadow-sm mb-3 cursor-pointer hover:border-rose-300 hover:shadow-md transition-all group block"
+          title="Account Settings"
+        >
           <img
             src={user?.profilePic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'}
             alt={user?.name}
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-200"
+            className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-200 group-hover:ring-rose-400 transition-all"
           />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800 truncate">{user?.name}</p>
+            <p className="text-sm font-bold text-slate-800 truncate group-hover:text-rose-600 transition-colors">
+              {user?.name}
+            </p>
             <p className="text-xs text-rose-600 font-medium truncate">{user?.email}</p>
           </div>
-        </div>
+        </Link>
 
         <button
           onClick={handleLogout}

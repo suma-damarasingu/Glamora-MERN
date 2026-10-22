@@ -60,13 +60,34 @@ const CustomerLayout = () => {
                 Book New Service
               </Link>
             </CustomerOnly>
-            <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-rose-200 shrink-0">
-              <img
-                src={user?.profilePic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'}
-                alt={user?.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
+
+            {/* Top-Right Clickable Profile Section */}
+            <Link
+              to="/dashboard/settings"
+              className="flex items-center gap-2.5 p-1 rounded-2xl hover:bg-rose-50/80 transition-all cursor-pointer group"
+              title="View & Edit Profile Settings"
+            >
+              <div className="text-right hidden sm:block">
+                <p className="text-xs font-bold text-slate-800 leading-tight group-hover:text-rose-600 transition-colors">
+                  {user?.name}
+                </p>
+                <p className="text-[10px] text-slate-500 font-medium truncate max-w-[160px]">
+                  {user?.email}
+                </p>
+                {user?.phone && (
+                  <p className="text-[9px] text-slate-400 font-medium truncate max-w-[160px]">
+                    {user?.phone}
+                  </p>
+                )}
+              </div>
+              <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-rose-200 shrink-0 group-hover:ring-rose-400 transition-all">
+                <img
+                  src={user?.profilePic || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'}
+                  alt={user?.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </Link>
           </div>
         </header>
 

@@ -55,19 +55,33 @@ const AdminLayout = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2.5">
+            {/* Top-Right Clickable Admin Profile Section */}
+            <Link
+              to="/admin/settings"
+              className="flex items-center gap-2.5 p-1 rounded-2xl hover:bg-rose-50/80 transition-all cursor-pointer group"
+              title="View & Edit Admin Settings"
+            >
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-800">{user?.name}</p>
-                <p className="text-[10px] font-semibold text-rose-600 uppercase">Super Administrator</p>
+                <p className="text-xs font-bold text-slate-800 leading-tight group-hover:text-rose-600 transition-colors">
+                  {user?.name}
+                </p>
+                <p className="text-[10px] text-rose-600 font-medium truncate max-w-[160px]">
+                  {user?.email}
+                </p>
+                {user?.phone && (
+                  <p className="text-[9px] text-slate-400 font-medium truncate max-w-[160px]">
+                    {user?.phone}
+                  </p>
+                )}
               </div>
-              <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-rose-300 shrink-0">
+              <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-rose-300 shrink-0 group-hover:ring-rose-500 transition-all">
                 <img
                   src={user?.profilePic || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80'}
                   alt={user?.name}
                   className="w-full h-full object-cover"
                 />
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 
